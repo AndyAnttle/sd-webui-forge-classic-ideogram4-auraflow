@@ -39,6 +39,13 @@ class ImageStitch(scripts.Script):
     def ui(self, is_img2img):
         with InputAccordion(value=False, label=self.title()) as enable:
             gr.HTML(i2i_info if is_img2img else t2i_info)
+            gr.HTML(
+                '<div style="text-align:right;margin:-10px 0 0 0">'
+                '<span style="cursor:help;opacity:.55;font-size:1.05em" '
+                'title="Qwen-Image 2.1: a reference replaces img2img, the input image becomes the first reference. '
+                'For regular img2img, disable [Qwen 2.1] Enable Reference in Settings / Stable Diffusion."'
+                '>&#10067;</span></div>'
+            )
             references = gr.Gallery(
                 value=None,
                 type="pil",
