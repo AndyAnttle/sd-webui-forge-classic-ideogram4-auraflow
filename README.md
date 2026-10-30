@@ -27,6 +27,26 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 #### New Features
 
+- [X] Support [MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3) (**native**, text or image to video **with generated audio**)
+    - pick the **minimax-h3** preset in **Settings/Presets** (Res Multistep / Simple / 20 steps / CFG 1 / Shift 12)
+    - requires three accompanying modules, all picked in **VAE / Text Encoder**: the **Qwen3-VL 32B** text encoder (`qwen3vl_32b_minimax_h3`, GGUF or fp8) and **two** VAEs, `minimax_h3_video_vae_fp16` and `minimax_h3_audio_vae_fp32`
+    - the **MiniMax H3** accordion in txt2img and img2img carries the whole pipeline:
+        - **Output**: `Video` (MP4, h264 24 fps plus AAC audio) or `Still image` (first frame of a 5-frame run)
+        - **Frames**: the slider follows the model's 5 + 17n grid (default 124, 5.17 s)
+        - **T2V**: nothing to attach; **I2V**: first frame in img2img, last frame in **ImageStitch Integrated** (txt2img), or both
+        - **Ref2VA**: `<Picture 1>` in img2img, up to 9 pictures in ImageStitch, reference videos and audio clips in the panel
+        - **Guide** (anchor a video or audio at a frame), **Control** (Fun ControlNet Union 2.0 with pose/depth/edge preprocessors and masks), **Upscale** (frame by frame with the usual Forge upscalers)
+        - **LoRA** row: lists files in `models/Lora` with `minimax` or `h3` in the name, checks the file header before use, and the **8-step turbo preset** button sets steps 8, Shift 6 and CFG 1
+    - for NVFP4 checkpoints set **Diffusion in Low Bits**, the dropdown next to the checkpoint, to `Automatic (fp16 LoRA)`: merging a LoRA into NVFP4 weights reloads the model and runs about 6 times slower per step (12 s/it vs 2.1 s/it on a 3090)
+    - on a 24 GB card keep the 32B text encoder on a second GPU (`--text-enc-device cuda:1`); the DiT and the encoder do not fit together
+    - needs **FFmpeg** for the MP4 export
+
+> [!Tip]
+> **MiniMax-H3 quick start**
+> - a first run that stays small: 512x288, 56 frames (2.33 s), 20 steps, about a minute on a 3090 once the model is loaded
+> - 768x768, 124 frames, 20 steps: about 11 minutes on a 3090; 1024x1024 is outside the model's 768p spec and costs about 81 s/step
+> - turbo: select `h3_turbo_8step` in the panel and press **8-step turbo preset**, or put `<lora:h3_turbo_8step:1>` into the prompt
+
 - [X] Support [Ideogram 4.0](https://huggingface.co/ideogram-research/Ideogram-4.0)
     - use **Ideogram 4 Studio** (see below) instead of the plain prompt box
     - requires two accompanying modules (selected in the VAE / Text Encoder dropdowns):
@@ -117,26 +137,6 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
     - `sdxl` / `qwen` / `flux1` / `flux2` (**not** `PixelDiT`)
     - use `PiD Integrated` to automatically upscale after generation
 - [X] Support [Z-Image](https://huggingface.co/Tongyi-MAI/Z-Image)
-- [X] Support [MiniMax-H3](https://huggingface.co/Comfy-Org/MiniMax-H3) (**native**, text or image to video **with generated audio**)
-    - pick the **minimax-h3** preset in **Settings/Presets** (Res Multistep / Simple / 20 steps / CFG 1 / Shift 12)
-    - requires three accompanying modules, all picked in **VAE / Text Encoder**: the **Qwen3-VL 32B** text encoder (`qwen3vl_32b_minimax_h3`, GGUF or fp8) and **two** VAEs, `minimax_h3_video_vae_fp16` and `minimax_h3_audio_vae_fp32`
-    - the **MiniMax H3** accordion in txt2img and img2img carries the whole pipeline:
-        - **Output**: `Video` (MP4, h264 24 fps plus AAC audio) or `Still image` (first frame of a 5-frame run)
-        - **Frames**: the slider follows the model's 5 + 17n grid (default 124, 5.17 s)
-        - **T2V**: nothing to attach; **I2V**: first frame in img2img, last frame in **ImageStitch Integrated** (txt2img), or both
-        - **Ref2VA**: `<Picture 1>` in img2img, up to 9 pictures in ImageStitch, reference videos and audio clips in the panel
-        - **Guide** (anchor a video or audio at a frame), **Control** (Fun ControlNet Union 2.0 with pose/depth/edge preprocessors and masks), **Upscale** (frame by frame with the usual Forge upscalers)
-        - **LoRA** row: lists files in `models/Lora` with `minimax` or `h3` in the name, checks the file header before use, and the **8-step turbo preset** button sets steps 8, Shift 6 and CFG 1
-    - for NVFP4 checkpoints set **Diffusion in Low Bits**, the dropdown next to the checkpoint, to `Automatic (fp16 LoRA)`: merging a LoRA into NVFP4 weights reloads the model and runs about 6 times slower per step (12 s/it vs 2.1 s/it on a 3090)
-    - on a 24 GB card keep the 32B text encoder on a second GPU (`--text-enc-device cuda:1`); the DiT and the encoder do not fit together
-    - needs **FFmpeg** for the MP4 export
-
-> [!Tip]
-> **MiniMax-H3 quick start**
-> - a first run that stays small: 512x288, 56 frames (2.33 s), 20 steps, about a minute on a 3090 once the model is loaded
-> - 768x768, 124 frames, 20 steps: about 11 minutes on a 3090; 1024x1024 is outside the model's 768p spec and costs about 81 s/step
-> - turbo: select `h3_turbo_8step` in the panel and press **8-step turbo preset**, or put `<lora:h3_turbo_8step:1>` into the prompt
-
 - [X] Support [Wan 2.2](https://github.com/Wan-Video/Wan2.2)
     - `14B` (**not** `5B`)
     - use `Refiner` to achieve **High Noise** / **Low Noise** switching
