@@ -141,12 +141,33 @@ FRAME_GRID = {
     PresetArch.h3.name: (5, 17, 362),
 }
 
+# a sensible first clip when the stored value is still the stock batch default (1)
+FRAME_DEFAULT = {
+    PresetArch.h3.name: 124,
+}
+
 
 def frame_grid(arch: str) -> tuple[int, int, int]:
     if arch in FRAME_GRID:
         return FRAME_GRID[arch]
     fps = is_video(arch)
     return (1, fps if fps > 1 else 1, max(8, fps * 15 + 1))
+
+
+def align_frames(arch: str, value) -> int:
+    """Snap a stored Frames value onto the preset's grid (h3: 5 + 17n), so the slider opens on a valid clip."""
+    minimum, step, maximum = frame_grid(arch)
+    try:
+        frames = int(value)
+    except (TypeError, ValueError):
+        frames = minimum
+    if frames < minimum:
+        frames = FRAME_DEFAULT.get(arch, minimum)
+    frames = max(minimum, min(maximum, frames))
+    if step > 1:
+        frames = minimum + step * round((frames - minimum) / step)
+        frames = max(minimum, min(maximum, frames))
+    return frames
 
 
 def use_distill(arch: str) -> bool:

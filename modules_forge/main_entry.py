@@ -19,7 +19,7 @@ from modules import (
     shared_items,
     ui_common,
 )
-from modules_forge.presets import PresetArch, frame_grid, is_video, use_distill, use_shift
+from modules_forge.presets import PresetArch, align_frames, frame_grid, is_video, use_distill, use_shift
 
 logger = logging.getLogger("ui_models")
 setup_logger(logger)
@@ -290,12 +290,12 @@ def on_preset_change(preset: str):
 
     if (fps := is_video(preset)) > 1:
         frame_min, frame_step, frame_max = frame_grid(preset)
-        batch_args_t2i = {"minimum": frame_min, "maximum": frame_max, "step": frame_step, "label": "Frames", "value": getattr(shared.opts, f"{preset}_t2i_batch_size", frame_min)}
+        batch_args_t2i = {"minimum": frame_min, "maximum": frame_max, "step": frame_step, "label": "Frames", "value": align_frames(preset, getattr(shared.opts, f"{preset}_t2i_batch_size", frame_min))}
     else:
         batch_args_t2i = {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch Size", "value": getattr(shared.opts, f"{preset}_t2i_batch_size", 1)}
 
     batch_args_i2i = batch_args_t2i.copy()
-    batch_args_i2i["value"] = getattr(shared.opts, f"{preset}_i2i_batch_size", 1)
+    batch_args_i2i["value"] = align_frames(preset, getattr(shared.opts, f"{preset}_i2i_batch_size", 1)) if is_video(preset) > 1 else getattr(shared.opts, f"{preset}_i2i_batch_size", 1)
 
     modules_value = [os.path.basename(m) for m in getattr(shared.opts, f"forge_additional_modules_{preset}", [])]
     if not shared.opts.sd_modules_dropdown_use_short:
