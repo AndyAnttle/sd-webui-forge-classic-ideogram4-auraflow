@@ -68,7 +68,7 @@ class Panel:
         self.tab = "img2img" if is_img2img else "txt2img"
         self.is_img2img = is_img2img
         self.saved = gr.State({"active": False})
-        with gr.Accordion("MiniMax H3", open=False, visible=False, elem_id=f"{self.tab}_h3_panel") as self.accordion:
+        with gr.Accordion("MiniMax H3", open=False, visible=True, elem_id=f"{self.tab}_h3_panel") as self.accordion:
             self.output = gr.Radio(["Video", "Still image"], value="Video", label="Output",
                                    visible=not is_img2img, elem_id=f"{self.tab}_h3_output")
             self.audio = gr.Checkbox(value=True, label="Include generated audio", elem_id=f"{self.tab}_h3_audio")
@@ -267,8 +267,11 @@ class Panel:
                     error = ""
                 except H3Error as exc:
                     error = str(exc)
-            status = html.escape(error) if error else ("H3 generates audio jointly. This checkbox controls audio in the exported video." if output == "Video" else "Still image uses the first frame of a 5-frame H3 generation.")
-            return [gr.update(visible=active), gr.update(visible=active and output == "Video"),
+            if not active and not error:
+                status = "Select a MiniMax H3 checkpoint (and its text encoder and two VAEs) to enable this panel."
+            else:
+                status = html.escape(error) if error else ("H3 generates audio jointly. This checkbox controls audio in the exported video." if output == "Video" else "Still image uses the first frame of a 5-frame H3 generation.")
+            return [gr.update(visible=True), gr.update(visible=active and output == "Video"),
                     gr.update(visible=active and output == "Video"), gr.update(visible=active and output == "Video"),
                     gr.update(value=f"{frames} frames / {FPS} FPS = {frames / FPS:.2f} seconds" if active else "",
                               visible=active and output == "Video"), status, summary, saved,

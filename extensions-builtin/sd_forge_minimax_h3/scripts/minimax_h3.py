@@ -10,7 +10,12 @@ if ROOT not in sys.path:
 
 from modules import script_callbacks, scripts, shared
 
+from backend.logging import setup_logger
 from forge_h3 import integration, ui
+
+import logging
+
+setup_logger(logging.getLogger("forge_h3"))
 
 ENABLED = False
 try:
