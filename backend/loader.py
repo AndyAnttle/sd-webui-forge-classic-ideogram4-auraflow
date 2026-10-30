@@ -177,7 +177,20 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
         if cls_name in ["AutoencoderKLWan", "AutoencoderKLQwenImage"]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have VAE state dict!"
 
-            if "post_quant_conv.weight" in state_dict:  # 2D
+            # The class is decided by the convolution rank, not by the mere presence of
+            # quant convolutions: 3D Wan-style exports (e.g. the Qwen-Image-2512 VAE)
+            # carry 5D quant_conv / post_quant_conv as well, so the old presence test
+            # built a 2D Qwen2DVAE for a 3D file and every weight failed to load.
+            _probe = state_dict.get("encoder.conv_in.weight", None)
+            _dim_fn = getattr(_probe, "dim", None)
+            _probe_dim = None
+            if callable(_dim_fn):
+                try:
+                    _probe_dim = _dim_fn()
+                except Exception:
+                    _probe_dim = None
+            _is_2d = (_probe_dim == 4) if _probe_dim is not None else ("post_quant_conv.weight" in state_dict)
+            if _is_2d:
                 from backend.nn.wan_vae_2d import Qwen2DVAE as WanVAE
 
                 config = {}

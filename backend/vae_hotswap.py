@@ -64,9 +64,14 @@ def file_interface(vae_sd: dict):
     def ch(k, i):
         return g[k][i] if k in g else None
 
-    if "encoder.conv1.weight" in g and len(g["encoder.conv1.weight"]) == 5:  # 3D wan-style
+    enc = g.get("encoder.conv1.weight") or g.get("encoder.conv_in.weight")
+    if enc is not None and len(enc) == 5:  # 3D wan-style (conv1 or conv_in, all 5D)
         z = ch("decoder.conv1.weight", 1)
+        if z is None:
+            z = ch("decoder.conv_in.weight", 1)
         img_ch = ch("decoder.head.2.weight", 0)
+        if img_ch is None:
+            img_ch = ch("decoder.conv_out.weight", 0)
         if z == 64 or img_ch == 4:
             return {"z": 64, "ratio": 16, "family": "qwen21", "layout": "3d"}
         if z == 16:
