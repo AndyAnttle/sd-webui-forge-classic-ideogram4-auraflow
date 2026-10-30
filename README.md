@@ -106,6 +106,8 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 > **Placing the text encoder on a second GPU**
 > Large checkpoints swap the text encoder in and out of VRAM on a single card. To keep it on its own GPU instead:
 > - expose both cards with the model card first: `set CUDA_VISIBLE_DEVICES=2,1` (the first entry becomes `cuda:0`)
+> - the numbers follow CUDA's own device order, which can differ from `nvidia-smi`; check it with
+>   `python -c "import torch; [print(i, torch.cuda.get_device_name(i)) for i in range(torch.cuda.device_count())]"`
 > - point the text encoder, and optionally the VAE, at the second one: `--text-enc-device cuda:1 --vae-device cuda:1`
 >
 > Both stay resident on that card afterwards, so prompts no longer pay a full encoder upload. `--gpu-device-id` is the opposite tool (it hides every other device), so do not combine it with these flags.
