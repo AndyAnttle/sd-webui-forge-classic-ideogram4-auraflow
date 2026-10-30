@@ -1427,7 +1427,12 @@ def soft_empty_cache(force=False):
         torch.xpu.empty_cache()
     elif torch.cuda.is_available():
         torch.cuda.synchronize()
-        torch.cuda.empty_cache()
+        # release cached blocks on every device that may hold a model: a text encoder
+        # or VAE placed on a second GPU keeps its freed blocks in that device's
+        # allocator cache otherwise, and nvidia-smi keeps reporting them as used
+        for _device_index in range(max(1, torch.cuda.device_count())):
+            with torch.cuda.device(_device_index):
+                torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
 
     global signal_empty_cache
@@ -1450,7 +1455,13 @@ def unload_model(model: "ModelPatcher") -> bool:
 
 
 def unload_all_models():
-    free_memory(1e30, get_torch_device())
+    devices = {get_torch_device()}
+    for loaded in list(current_loaded_models):
+        model = loaded.model
+        if model is not None and not is_device_cpu(model.load_device):
+            devices.add(model.load_device)
+    for device in devices:
+        free_memory(1e30, device)
 
 
 # region Streams
