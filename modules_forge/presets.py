@@ -25,6 +25,10 @@ class PresetArch(Enum):
         return [preset.name for preset in PresetArch]
 
 
+# the UI shows the name; the enum member stays "h3" so old option keys and code keep working
+PresetArch.h3._name_ = "minimax-h3"
+
+
 SAMPLERS = {
     PresetArch.sd: "Euler a",
     PresetArch.xl: "Euler a",

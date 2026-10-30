@@ -208,6 +208,10 @@ def get_a1111_ui_component(tab: str, label: str) -> gr.components.Component:
 
 
 def forge_main_entry():
+    # "h3" was the preset name before it was spelled out; keep an existing selection working
+    if getattr(shared.opts, "forge_preset", None) == "h3":
+        shared.opts.data["forge_preset"] = "minimax-h3"
+
     ui_txt2img_steps = get_a1111_ui_component("txt2img", "Steps")
     ui_txt2img_hr_steps = get_a1111_ui_component("txt2img", "Hires steps")
     ui_img2img_steps = get_a1111_ui_component("img2img", "Steps")
