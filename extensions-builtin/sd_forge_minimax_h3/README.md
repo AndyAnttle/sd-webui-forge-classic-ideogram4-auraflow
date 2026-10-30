@@ -7,7 +7,7 @@ The **MiniMax H3** accordion is present in txt2img and img2img and starts collap
 
 | Role | File | Where |
 |---|---|---|
-| Checkpoint (DiT) | `h3-nvfp4-10eros.safetensors` (NVFP4, 12.5 GB) | `models/Stable-diffusion/MiniMax-H3/` |
+| Checkpoint (DiT) | `h3-nvfp4.safetensors` (NVFP4, 12.5 GB) | `models/Stable-diffusion/MiniMax-H3/` |
 | Text encoder | `qwen3vl_32b-Q4_K_M.gguf` (14.6 GB) | `models/text_encoder/MiniMax-H3/` |
 | Video VAE | `minimax_h3_video_vae_fp16.safetensors` (5.2 GB) | `models/VAE/MiniMax-H3/` |
 | Audio VAE | `minimax_h3_audio_vae_fp32.safetensors` (0.6 GB) | `models/VAE/MiniMax-H3/` |
@@ -19,7 +19,7 @@ All files live in `V:\VidModels\MiniMAX-H3` and are linked into these folders.
 ## 2. UI order
 
 1. Pick **minimax-h3** in the **UI Preset** dropdown at the top (or in Settings / Presets).
-2. **Checkpoint**: `MiniMax-H3/h3-nvfp4-10eros` (or INT8-pruned, or the Q4_K_M GGUF).
+2. **Checkpoint**: `MiniMax-H3/h3-nvfp4` (or INT8-pruned, or the Q4_K_M GGUF).
 3. **VAE / Text Encoder** (multi-select): pick three files, the text encoder plus the video VAE and the audio VAE. Forge has no separate VAE dropdown, the VAE is chosen here.
 4. Size: 768x432 for 16:9, 512x288 for quick tests; both sides are multiples of 16.
 5. **Frames**: the slider follows the 5 + 17n grid (5, 22, 39 ... 362), default 124 (5.17 s). For a test, 56 (2.33 s).
@@ -51,7 +51,7 @@ All files live in `V:\VidModels\MiniMAX-H3` and are linked into these folders.
 
 ## 6. Reproducing the verified result
 
-- Model: `h3-nvfp4-10eros` (NVFP4).
+- Model: `h3-nvfp4` (NVFP4).
 - Text encoder: `qwen3vl_32b-Q4_K_M.gguf`.
 - VAEs: `minimax_h3_video_vae_fp16` + `minimax_h3_audio_vae_fp32`.
 - 512x288, Frames 56, Steps 20, Res Multistep, Simple, CFG 1, Shift 12, seed 555.
@@ -71,6 +71,7 @@ All files live in `V:\VidModels\MiniMAX-H3` and are linked into these folders.
 ## 8. Memory and launch
 
 - Keep the 32B text encoder on the second card: `CUDA_VISIBLE_DEVICES` with two 3090s and `--text-enc-device cuda:1`.
+- A single 24 GB card also works: before sampling the panel releases the encoder from the model card, the DiT then loads in full instead of lowvram. Each prompt pays the encoder upload again (about 90 s for the 14.6 GB GGUF).
 - DiT NVFP4 about 12.5 GB, video VAE 5.2 GB, audio VAE 0.6 GB: fits a 24 GB card with room to spare.
 - INT8-pruned (21 GB) leaves almost no headroom on a 24 GB card and the second run may fail; prefer NVFP4.
 - `--cuda-malloc` is recommended, as for the other large models.

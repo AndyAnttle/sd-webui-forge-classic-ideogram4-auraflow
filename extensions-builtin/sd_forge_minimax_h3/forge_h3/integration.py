@@ -363,6 +363,29 @@ def _before_process(p, output, include_audio, audio_shift, ref_audios=(), ref_vi
     print(f"[MiniMax H3] {request.output.lower()}: {request.frames} frames at {request.width}x{request.height}, {audio}{conditioning}")
 
 
+def _free_shared_card(p):
+    """A single card cannot hold the 32B text encoder and the DiT together. Forge keeps the encoder resident and
+    loads the DiT in lowvram (5 GB of 12), which is slow and runs out of memory once the VAEs join; release every
+    model from the model card before sampling instead, the sampler reloads the DiT on its own."""
+    try:
+        import torch
+        from backend import memory_management
+        objects = p.sd_model.forge_objects
+        main = memory_management.get_torch_device()
+        main_index = main.index if main.index is not None else torch.cuda.current_device()
+        clip = getattr(getattr(objects, "clip", None), "patcher", None)
+        if clip is None or clip.load_device.type != "cuda":
+            return
+        index = clip.load_device.index if clip.load_device.index is not None else torch.cuda.current_device()
+        if index != main_index:
+            return
+        memory_management.logger.info("H3: releasing the text encoder from the model card before sampling")
+        memory_management.unload_all_models()
+        memory_management.soft_empty_cache()
+    except Exception:
+        pass
+
+
 def process(p):
     request = getattr(p, "h3_request", None)
     if request is None:
@@ -443,6 +466,8 @@ def before_sampling(p, noise):
     if getattr(p, "init_latent", None) is not None:
         # img2img samples from init_latent at full denoise; the packed start is pure noise
         p.init_latent = torch.zeros_like(p.modified_noise)
+    # the sampler loads the DiT right after this hook: hand it the whole card
+    _free_shared_card(p)
 
 
 def _note_pdd(p):

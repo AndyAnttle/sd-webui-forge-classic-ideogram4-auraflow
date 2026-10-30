@@ -38,7 +38,7 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
         - **Guide** (anchor a video or audio at a frame), **Control** (Fun ControlNet Union 2.0 with pose/depth/edge preprocessors and masks), **Upscale** (frame by frame with the usual Forge upscalers)
         - **LoRA** row: lists files in `models/Lora` with `minimax` or `h3` in the name, checks the file header before use, and the **8-step turbo preset** button sets steps 8, Shift 6 and CFG 1
     - for NVFP4 checkpoints set **Diffusion in Low Bits**, the dropdown next to the checkpoint, to `Automatic (fp16 LoRA)`: merging a LoRA into NVFP4 weights reloads the model and runs about 6 times slower per step (12 s/it vs 2.1 s/it on a 3090)
-    - on a 24 GB card keep the 32B text encoder on a second GPU (`--text-enc-device cuda:1`); the DiT and the encoder do not fit together
+    - on a 24 GB card keep the 32B text encoder on a second GPU (`--text-enc-device cuda:1`); the DiT and the encoder do not fit together. On a single card the encoder is released from the model card before sampling and the DiT loads in full, so it runs, at the cost of uploading the encoder again for every prompt
     - needs **FFmpeg** for the MP4 export
 
 > [!Tip]

@@ -19,6 +19,14 @@ class CLIP:
         self.tokenizer = ObjectDict(tokenizer_dict)
         self.patcher = ModelPatcher(self.cond_stage_model, load_device=load_device, offload_device=offload_device)
 
+        try:
+            memory_management.logger.info(
+                "Text encoder placement: load=%s, offload=%s, size=%.2f GiB, total=%.2f GiB",
+                load_device, self.patcher.offload_device, self.patcher.model_size() / 2**30,
+                memory_management.get_total_memory(load_device) / 2**30)
+        except Exception:
+            pass
+
         # A text encoder explicitly placed on its own GPU stays resident there (see
         # memory_management.text_encoder_offload_device), but only while it leaves room to work:
         # a 32B encoder that fills the card cannot allocate the transient buffers of the next
