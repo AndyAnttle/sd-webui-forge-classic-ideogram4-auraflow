@@ -5,6 +5,8 @@ import logging
 
 import gradio as gr
 
+from modules import shared
+
 from .contracts import (
     AUDIO_SHIFT,
     DEFAULT_FRAMES,
@@ -15,6 +17,7 @@ from .contracts import (
     H3Error,
 )
 from .control import PREPROCESSORS
+from . import loras
 from .integration import CONTROL2_OFF, checkpoint_info
 from .models import ROLE_LABELS, inspect_model
 from .ui_state import frame_view, preset_frame_view
@@ -44,6 +47,21 @@ def control_names():
 
 def control_choices():
     return gr.update(choices=control_names())
+
+
+def lora_choices():
+    return gr.update(choices=loras.names())
+
+
+def lora_changed(name):
+    if not name:
+        return gr.update(value=""), gr.update(interactive=False)
+    ok, info = loras.check(name)
+    text = ("✅ " if ok else "⚠️ ") + info
+    if ok and "fp16 LoRA" not in str(getattr(shared.opts, "forge_unet_storage_dtype", "")):
+        text += ("\n\nSet **Diffusion in Low Bits** to `Automatic (fp16 LoRA)`: merging the LoRA into the NVFP4 "
+                 "weights reloads the model for 2.5 minutes and runs about 6 times slower per step.")
+    return gr.update(value=text), gr.update(interactive=ok)
 
 
 def _in_blocks():
@@ -168,6 +186,20 @@ class Panel:
                                                 elem_id=f"{self.tab}_h3_upscaler")
                     self.upscale_by = gr.Slider(minimum=1.0, maximum=MAX_UPSCALE, step=0.05, value=2.0,
                                                 label="Upscale by", elem_id=f"{self.tab}_h3_upscale_by")
+            # optional LoRA: the tag is added to the prompt in before_process, so Forge loads it the usual way
+            with gr.Row():
+                self.lora = gr.Dropdown(choices=loras.names(), value="", label="LoRA",
+                                        info="The LoRA file name must contain minimax or h3.",
+                                        elem_id=f"{self.tab}_h3_lora")
+                self.lora_refresh = gr.Button("🔄", scale=0, min_width=40, elem_id=f"{self.tab}_h3_lora_refresh")
+                self.lora_weight = gr.Slider(minimum=0.5, maximum=1.5, step=0.05, value=1.0, label="LoRA weight",
+                                             elem_id=f"{self.tab}_h3_lora_weight")
+            with gr.Row():
+                self.lora_preset = gr.Button("8-step turbo preset", interactive=False,
+                                             elem_id=f"{self.tab}_h3_lora_preset")
+            self.lora_status = gr.Markdown("")
+            self.lora.change(lora_changed, inputs=[self.lora], outputs=[self.lora_status, self.lora_preset])
+            self.lora_refresh.click(lora_choices, outputs=[self.lora], queue=False, show_progress=False)
             self.status = gr.Markdown("Select the H3 text encoder, video VAE and audio VAE in VAE / Text Encoder.")
             with gr.Accordion("Components", open=False):
                 self.summary = gr.Markdown("")
@@ -182,7 +214,7 @@ class Panel:
                 self.guide_soundtrack, self.guide_audio, self.guide_frame, self.control_model, self.control_video,
                 self.preprocessor, self.control_mask, self.control_source, self.control_strength, self.control_start,
                 self.control_end, self.control2_video, self.preprocessor2, self.control2_strength, self.control2_start,
-                self.control2_end, self.soundtrack, self.upscaler, self.upscale_by]
+                self.control2_end, self.soundtrack, self.upscaler, self.upscale_by, self.lora, self.lora_weight]
 
     @property
     def needed(self):
@@ -211,6 +243,19 @@ class Panel:
         preset_input = [preset] if preset is not None else []
         hidden = [(COMPONENTS[key], COMPONENTS[f"{key}-checkbox"]) for key in (f"{self.tab}_{name}" for name in HIDDEN_ACCORDIONS)
                   if key in COMPONENTS and f"{key}-checkbox" in COMPONENTS]
+        steps = COMPONENTS.get(f"{self.tab}_steps")
+        shift = COMPONENTS.get(f"{self.tab}_distilled_cfg_scale")
+        cfg = COMPONENTS.get(f"{self.tab}_cfg_scale")
+
+        def turbo_preset():
+            updates = [gr.update(value=8), gr.update(value=6.0)]
+            if cfg is not None:
+                updates.append(gr.update(value=1.0))
+            return updates
+
+        if steps is not None and shift is not None:
+            self.lora_preset.click(turbo_preset, outputs=[c for c in (steps, shift, cfg) if c is not None],
+                                   queue=False, show_progress=False)
         inputs = [checkpoint, self.output, modules, self.saved] + native + preset_input
         outputs = ([self.accordion, self.audio, self.audio_shift, self.soundtrack, duration, self.status, self.summary,
                     self.saved, self.reference_media] + native + preset_input

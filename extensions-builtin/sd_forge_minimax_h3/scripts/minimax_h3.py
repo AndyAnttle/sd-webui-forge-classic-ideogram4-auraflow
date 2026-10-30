@@ -42,8 +42,14 @@ class Script(scripts.Script):
         self.infotext_fields = [(self.panel.audio_shift, "H3 Audio shift")]
         return self.panel.inputs
 
-    def before_process(self, p, output="Video", include_audio=True, audio_shift=3.0, *media):
-        integration.script_before_process(p, output, include_audio, audio_shift, *media)
+    def before_process(self, p, *args):
+        lora = (None, 1.0)
+        inputs = len(self.panel.inputs) if getattr(self, "panel", None) is not None else 0
+        # the LoRA name and weight travel last, so API callers that send only the first three values keep working
+        if inputs and len(args) >= inputs - 1:
+            lora = (args[-2], args[-1])
+            args = args[:-2]
+        integration.script_before_process(p, *args, lora=lora)
 
     def process(self, p, *args):
         integration.process(p)

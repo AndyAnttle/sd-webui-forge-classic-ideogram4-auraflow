@@ -8,7 +8,7 @@ import json
 import uuid
 from pathlib import Path
 
-from . import keyframes, references
+from . import keyframes, loras, references
 from . import upscale as upscale_module
 from .contracts import (
     AUDIO_SHIFT,
@@ -216,24 +216,38 @@ def collect_control(settings, width, height, frames, ffmpeg=""):
         finish_preprocessor()
 
 
-def before_process(p, output, include_audio, audio_shift=AUDIO_SHIFT, ref_audios=(), ref_videos=(), keep_soundtrack=True,
+def _apply_lora(p, lora):
+    """Add the panel's LoRA as a prompt tag: Forge then loads it the usual way and writes it to the infotext."""
+    name, weight = lora if lora else (None, 1.0)
+    if not name:
+        return
+    ok, reason = loras.check(name)
+    if not ok:
+        print(f"[MiniMax H3] LoRA {name} skipped: {reason}")
+        return
+    if f"<lora:{loras.prompt_name(name)}:" in p.prompt:
+        return
+    p.prompt = f"{p.prompt} {loras.tag(name, weight)}".strip()
+
+
+def before_process(p, output, include_audio, audio_shift=AUDIO_SHIFT, lora=(None, 1.0), ref_audios=(), ref_videos=(), keep_soundtrack=True,
                    guide=None, ref_media=(), control=None, control2=None, soundtrack=GENERATED_SOUNDTRACK, upscale=None):
     """Before Forge loads the model: check the request and turn Frames into a single H3 generation."""
     p.h3_request = None
     set_pending_error(None)
     try:
         _before_process(p, output, include_audio, audio_shift, ref_audios, ref_videos, keep_soundtrack, guide, ref_media,
-                        control, control2, soundtrack, upscale)
+                        control, control2, soundtrack, upscale, lora=lora)
     except H3Error as error:
         set_pending_error(error)
         raise
 
 
-def script_before_process(p, output, include_audio, audio_shift=AUDIO_SHIFT, *media):
+def script_before_process(p, output, include_audio, audio_shift=AUDIO_SHIFT, *media, lora=(None, 1.0)):
     """before_process as Forge's script runner calls it: a rejected request prints one line instead of the traceback
     Forge logs for any exception; the error stays pending and stops the generation when the model is first called."""
     try:
-        before_process(p, output, include_audio, audio_shift, **panel_media(media))
+        before_process(p, output, include_audio, audio_shift, lora=lora, **panel_media(media))
     except H3Error as error:
         print(f"[MiniMax H3] {error}")
 
@@ -247,7 +261,8 @@ def validate_img2img(p, mode="fl2va"):
 
 
 def _before_process(p, output, include_audio, audio_shift, ref_audios=(), ref_videos=(), keep_soundtrack=True, guide=None,
-                    ref_media=(), control=None, control2=None, soundtrack=GENERATED_SOUNDTRACK, upscale=None):
+                    ref_media=(), control=None, control2=None, soundtrack=GENERATED_SOUNDTRACK, upscale=None,
+                    lora=(None, 1.0)):
     p.h3_controls = []
     p.h3_soundtrack = None
     p.h3_upscale = None
@@ -259,6 +274,7 @@ def _before_process(p, output, include_audio, audio_shift, ref_audios=(), ref_vi
     info = select_h3(p)
     if info is None:
         return
+    _apply_lora(p, lora)
     from modules import processing, shared
     is_img2img = isinstance(p, processing.StableDiffusionProcessingImg2Img)
     validate_processing(p)
