@@ -10,6 +10,7 @@ import os
 import re
 import string
 import subprocess
+import tempfile
 import time
 from collections import namedtuple
 
@@ -949,7 +950,25 @@ def fix_png_transparency(image: Image.Image):
     return image
 
 
-def save_video(p, frames: list[np.ndarray], fps: int = 16, *, basename: str = "", info: str = None, audio_copy: os.PathLike = None) -> str:
+def _write_wav(audio: np.ndarray, sample_rate: int = 32000) -> str:
+    """Float audio in [-1, 1] ([samples], [1, samples] or [2, samples]) -> a temporary 16-bit WAV for ffmpeg."""
+    import wave
+
+    audio = np.asarray(audio, dtype=np.float32)
+    if audio.ndim == 1:
+        audio = audio[None, :]
+    channels, _ = audio.shape
+    path = os.path.join(tempfile.gettempdir(), f"forge_video_audio_{os.getpid()}_{int(time.time() * 1000)}.wav")
+    pcm = (np.clip(np.asarray(audio, dtype=np.float32), -1.0, 1.0).T * 32767.0).astype(np.int16)
+    with wave.open(path, "wb") as w:
+        w.setnchannels(channels)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate)
+        w.writeframes(pcm.tobytes())
+    return path
+
+
+def save_video(p, frames: list[np.ndarray], fps: int = 16, *, basename: str = "", info: str = None, audio_copy: os.PathLike = None, audio: np.ndarray = None, audio_sample_rate: int = 32000) -> str:
     height, width, channels = frames[0].shape
     assert channels == 3, "Frames must be in (H, W, 3) RGB format"
 
@@ -1006,6 +1025,9 @@ def save_video(p, frames: list[np.ndarray], fps: int = 16, *, basename: str = ""
         "-",
     ]
 
+    if audio is not None:
+        audio_copy = _write_wav(audio, audio_sample_rate)
+
     if audio_copy is not None:
         cmd += [
             "-i",
@@ -1014,9 +1036,11 @@ def save_video(p, frames: list[np.ndarray], fps: int = 16, *, basename: str = ""
             "0:v",
             "-map",
             "1:a?",
-            "-acodec",
-            "copy",
         ]
+        if audio is not None:
+            cmd += ["-c:a", "aac", "-b:a", "192k"]
+        else:
+            cmd += ["-acodec", "copy"]
 
     cmd += [
         "-vcodec",
@@ -1039,6 +1063,12 @@ def save_video(p, frames: list[np.ndarray], fps: int = 16, *, basename: str = ""
         proc.stdin.write(frame.tobytes())
     proc.stdin.close()
     proc.wait()
+
+    if audio is not None and audio_copy is not None:
+        try:
+            os.remove(audio_copy)
+        except OSError:
+            pass
 
     if opts.save_txt and info is not None:
         txt_fullfn = os.path.join(folder, f"{file_decoration}.txt")

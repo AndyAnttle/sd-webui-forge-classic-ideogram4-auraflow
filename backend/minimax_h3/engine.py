@@ -71,6 +71,9 @@ class MiniMaxH3Engine(ForgeDiffusionEngine):
         self.forge_objects_after_applying_lora = self.forge_objects.shallow_copy()
 
         self.is_h3 = True
+        # a video model: Forge's generic video path reads these (frames grid comes from the preset, see presets.FRAMES)
+        self.is_video = True
+        self.fps = 24
         # Forge's Shift slider (the "h3" UI preset) sets the video flow shift; the audio stream keeps its own
         self.use_shift = True
         self.video_shift = VIDEO_SHIFT

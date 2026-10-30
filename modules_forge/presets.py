@@ -136,6 +136,18 @@ FRAMES = {
     PresetArch.h3.name: 24,
 }
 
+# per-preset Frames slider geometry: (minimum, step, maximum). MiniMax H3 accepts 5 + 17n frames only
+FRAME_GRID = {
+    PresetArch.h3.name: (5, 17, 362),
+}
+
+
+def frame_grid(arch: str) -> tuple[int, int, int]:
+    if arch in FRAME_GRID:
+        return FRAME_GRID[arch]
+    fps = is_video(arch)
+    return (1, fps if fps > 1 else 1, max(8, fps * 15 + 1))
+
 
 def use_distill(arch: str) -> bool:
     return arch in [preset.name for preset in DISTILL.keys()]

@@ -888,12 +888,19 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
     _times = 1
     _is_video = False
     video_path = None
+    _video_fps = 16
     if shared.sd_model.is_wan and args.dynamic_args.wan:
         _times = ((getattr(p, "batch_size", 1) - 1) // 4) + 1  # https://github.com/comfyanonymous/ComfyUI/blob/v0.3.64/comfy_extras/nodes_wan.py#L41
         p.batch_size = (_times - 1) * 4 + 1
         _is_video: bool = _times > 1
         if _is_video:
             p.do_not_save_grid = True
+    elif getattr(shared.sd_model, "is_video", False):
+        # generic video models (MiniMax H3): Frames arrive as batch_size on the model's own grid,
+        # the engine keeps the decoded frames and the waveform in model.generation
+        _is_video = True
+        _video_fps = int(getattr(shared.sd_model, "fps", 24))
+        p.do_not_save_grid = True
 
     if args.dynamic_args.pid and isinstance(p, StableDiffusionProcessingTxt2Img):
         raise RuntimeError("PiD does not support txt2img")
@@ -1157,7 +1164,18 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
                             output_images.append(image_mask_composite)
 
             if _is_video:
-                video_path = images.save_video(p, frames, info=infotext(use_main_prompt=True))
+                _video_audio = None
+                if getattr(shared.sd_model, "is_h3", False):
+                    _generation = getattr(shared.sd_model, "generation", None)
+                    if _generation is not None and _generation.frames is not None:
+                        # the engine decoded the whole clip; Forge was handed only its first frame
+                        frames = [
+                            f.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()
+                            for f in _generation.frames
+                        ]
+                        if _generation.waveform is not None:
+                            _video_audio = _generation.waveform.float().cpu().numpy()
+                video_path = images.save_video(p, frames, fps=_video_fps, info=infotext(use_main_prompt=True), audio=_video_audio)
                 del frames
 
             del x_samples_ddim

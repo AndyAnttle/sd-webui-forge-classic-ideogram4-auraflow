@@ -19,7 +19,7 @@ from modules import (
     shared_items,
     ui_common,
 )
-from modules_forge.presets import PresetArch, is_video, use_distill, use_shift
+from modules_forge.presets import PresetArch, frame_grid, is_video, use_distill, use_shift
 
 logger = logging.getLogger("ui_models")
 setup_logger(logger)
@@ -289,7 +289,8 @@ def on_preset_change(preset: str):
         d_args = {"visible": False}
 
     if (fps := is_video(preset)) > 1:
-        batch_args_t2i = {"minimum": 1, "maximum": fps * 15 + 1, "step": fps, "label": "Frames", "value": getattr(shared.opts, f"{preset}_t2i_batch_size", 1)}
+        frame_min, frame_step, frame_max = frame_grid(preset)
+        batch_args_t2i = {"minimum": frame_min, "maximum": frame_max, "step": frame_step, "label": "Frames", "value": getattr(shared.opts, f"{preset}_t2i_batch_size", frame_min)}
     else:
         batch_args_t2i = {"minimum": 1, "maximum": 8, "step": 1, "label": "Batch Size", "value": getattr(shared.opts, f"{preset}_t2i_batch_size", 1)}
 
