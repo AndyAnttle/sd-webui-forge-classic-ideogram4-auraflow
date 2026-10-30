@@ -91,12 +91,21 @@ class Attention(nn.Module):
 
 
 class MLP(nn.Module):
+    # 124 frames at 768p is about 70k tokens; the 2x ffn projection of all of them at once needs several GB.
+    # The feed-forward is per token, so run it in slices and keep the peak proportional to the slice.
+    token_chunk = 8192
+
     def __init__(self, hidden, ffn, dtype=None, device=None):
         super().__init__()
         self.fc1 = nn.Linear(hidden, ffn * 2, bias=False, dtype=dtype, device=device)
         self.fc2 = nn.Linear(ffn, hidden, bias=False, dtype=dtype, device=device)
 
     def forward(self, x):
+        if x.shape[0] > self.token_chunk:
+            return torch.cat([self._forward(chunk) for chunk in x.split(self.token_chunk, dim=0)], dim=0)
+        return self._forward(x)
+
+    def _forward(self, x):
         gate, up = self.fc1(x).chunk(2, dim=-1)
         return self.fc2(nn.functional.silu(gate).mul_(up))
 
