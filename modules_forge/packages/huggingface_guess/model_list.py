@@ -796,6 +796,35 @@ class Ideogram4(BASE):
         return {}
 
 
+class MiniMaxH3(BASE):
+    # MiniMax H3 omni-modal video + audio model (FL2VA / Ref2VA checkpoints)
+    huggingface_repo = "MiniMax-H3"
+
+    unet_config = {"image_model": "minimax_h3"}
+
+    # discrete flow, timestep = sigma * 1000 as the DiT expects; the audio stream derives its own shift from the video sigma
+    sampling_settings = {"shift": 12.0, "multiplier": 1000, "audio_shift": 3.0}
+
+    # ComfyUI's 0.114 under its 0.01 MB/element estimate; Forge Neo's KModel uses 0.02
+    memory_usage_factor = 0.057
+
+    supported_inference_dtypes = [torch.bfloat16, torch.float32]
+
+    unet_extra_config = {}
+    latent_format = latent.MiniMaxH3Latent
+
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    unet_target = "transformer"
+
+    def clip_target(self, state_dict={}):
+        return {"qwen3vl_32b.transformer": "text_encoder"}
+
+    def model_type(self, state_dict):
+        return ModelType.FLOW
+
+
 models = [
     SD15,
     SDXL,
@@ -819,4 +848,5 @@ models = [
     PiD,
     AuraFlow,
     Ideogram4,
+    MiniMaxH3,
 ]

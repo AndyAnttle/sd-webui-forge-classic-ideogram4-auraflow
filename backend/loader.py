@@ -22,6 +22,7 @@ from backend.diffusion_engine.flux2 import Flux2
 from backend.diffusion_engine.krea import Krea2
 from backend.diffusion_engine.lumina import Lumina2
 from backend.diffusion_engine.moss_image import MOSSImage
+from backend.diffusion_engine.minimax_h3 import MiniMaxH3Engine
 from backend.diffusion_engine.mugen import Mugen
 from backend.diffusion_engine.pid import PiD
 from backend.diffusion_engine.qwen import QwenImage
@@ -47,7 +48,7 @@ from backend.utils import (
 )
 from modules_forge.packages.comfy.utils import convert_diffusers_mmdit
 
-possible_models: tuple["ForgeDiffusionEngine"] = (StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Mugen, Chroma, Flux, Flux2, Wan, QwenImage, QwenImage21, Krea2, Lumina2, ZImage, Anima, ErnieImage, PiD, AuraFlow, Ideogram4, MOSSImage)
+possible_models: tuple["ForgeDiffusionEngine"] = (StableDiffusion, StableDiffusionXLRefiner, StableDiffusionXL, Mugen, Chroma, Flux, Flux2, Wan, QwenImage, QwenImage21, Krea2, Lumina2, ZImage, Anima, ErnieImage, PiD, AuraFlow, Ideogram4, MOSSImage, MiniMaxH3Engine)
 
 logger = logging.getLogger("loader")
 setup_logger(logger)
@@ -57,6 +58,11 @@ HF = os.path.join(os.path.dirname(__file__), "huggingface")
 
 def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_path, state_dict):
     config_path = os.path.join(repo_path, component_name)
+
+    if cls_name == "AutoencoderMiniMaxH3":
+        from backend.minimax_h3 import loading as h3
+
+        return h3.load_vae(state_dict)
 
     if component_name in ["feature_extractor", "safety_checker"]:
         return None
@@ -360,6 +366,11 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             if cls_name == "Qwen3VLModel":
                 from backend.nn.llm.llama import Qwen3VL
 
+                if getattr(guess, "huggingface_repo", "") == "MiniMax-H3":
+                    from backend.minimax_h3 import loading as h3
+
+                    Qwen3VL = h3.text_encoder_class()
+
                 QTE = partial(Qwen3VL, model_type="qwen3vl_4b")
             elif cls_name == "Qwen3VLForConditionalGeneration":
                 from backend.nn.llm.llama import Qwen3VL
@@ -371,6 +382,12 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 from backend.nn.llm.llama import Qwen3_4B as QTE
             else:
                 from backend.nn.llm.llama import Qwen3_06B as QTE
+
+            _h3_gguf = False
+            if getattr(guess, "huggingface_repo", "") == "MiniMax-H3":
+                from backend.minimax_h3 import loading as h3
+
+                _h3_gguf = h3.before_text_encoder_build(state_dict)
 
             quant_config = detect_quantization(state_dict)
             storage_dtype = _detect_dtype("Qwen3", memory_management.text_encoder_dtype(), quant_config)
@@ -395,6 +412,12 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 )
 
             load_state_dict(model, state_dict, log_name=cls_name, ignore_start="lm_head.")
+
+            if getattr(guess, "huggingface_repo", "") == "MiniMax-H3":
+                from backend.minimax_h3 import loading as h3
+
+                h3.after_text_encoder_build(model, _h3_gguf)
+
             return model
         if cls_name == "Qwen3_5Model":
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have Qwen3.5 state dict!"
@@ -460,7 +483,7 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
 
         # region UNet / DiT
 
-        if cls_name in ["UNet2DConditionModel", "FluxTransformer2DModel", "Flux2Transformer2DModel", "ChromaTransformer2DModel", "WanTransformer3DModel", "QwenImageTransformer2DModel", "QwenImage21Transformer2DModel", "Lumina2Transformer2DModel", "ZImageTransformer2DModel", "CosmosTransformer3DModel", "ErnieImageTransformer2DModel", "PiDTransformer2DModel", "Krea2Transformer2DModel", "AuraFlowTransformer2DModel", "Ideogram4Transformer2DModel", "MOSSImageTransformer"]:
+        if cls_name in ["UNet2DConditionModel", "FluxTransformer2DModel", "Flux2Transformer2DModel", "ChromaTransformer2DModel", "WanTransformer3DModel", "QwenImageTransformer2DModel", "QwenImage21Transformer2DModel", "Lumina2Transformer2DModel", "ZImageTransformer2DModel", "CosmosTransformer3DModel", "ErnieImageTransformer2DModel", "PiDTransformer2DModel", "Krea2Transformer2DModel", "AuraFlowTransformer2DModel", "Ideogram4Transformer2DModel", "MOSSImageTransformer", "MiniMaxH3Transformer3DModel"]:
             assert isinstance(state_dict, dict) and len(state_dict) > 16, "You do not have model state dict!"
             pre_func: Callable[[torch.nn.Module], torch.nn.Module] = lambda mdl: mdl
             model_loader = None
@@ -530,6 +553,12 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
                 from backend.nn.krea import SingleStreamDiT
 
                 model_loader = lambda c: SingleStreamDiT(**c)
+            elif cls_name == "MiniMaxH3Transformer3DModel":
+                from backend.minimax_h3 import loading as h3
+
+                _h3_islands = h3.transformer_islands(state_dict)
+                _h3_model_cls = h3.transformer_class()
+                model_loader = lambda c: _h3_model_cls(**c)
             elif cls_name == "AuraFlowTransformer2DModel":
                 from backend.nn.auraflow import MMDiT
 
@@ -602,6 +631,11 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
             load_state_dict(model, state_dict)
             # model = post_func(model)
 
+            if cls_name == "MiniMaxH3Transformer3DModel":
+                from backend.minimax_h3 import loading as h3
+
+                h3.restore_transformer_islands(model, _h3_islands)
+
             model.config = unet_config
             model.storage_dtype = storage_dtype
             model.computation_dtype = computation_dtype
@@ -618,6 +652,12 @@ def load_huggingface_component(guess, component_name, lib_name, cls_name, repo_p
 def replace_state_dict(sd: dict[str, torch.Tensor], asd: dict[str, torch.Tensor], guess, path: os.PathLike):
     vae_key_prefix = guess.vae_key_prefix[0]
     text_encoder_key_prefix = guess.text_encoder_key_prefix[0]
+
+    if getattr(guess, "huggingface_repo", "") == "MiniMax-H3":
+        from backend.minimax_h3 import loading as h3
+
+        h3.replace_state_dict(sd, asd, guess, path)
+        return sd
 
     if path.endswith("gguf"):
         from backend.loader_gguf import gguf_remapping

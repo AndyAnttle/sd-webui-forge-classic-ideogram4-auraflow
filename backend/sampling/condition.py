@@ -45,6 +45,15 @@ class ConditionNoiseShape(Condition):
 
 class ConditionCrossAttn(Condition):
     def can_concat(self, other):
+        # MiniMax H3 packs the prompt into its own sequence: repeating the prompt with the negative prompt
+        # would change the text, so its prompt and negative always run as separate batches (ComfyUI does the same)
+        try:
+            from modules import shared
+
+            if getattr(shared.sd_model, "is_h3", False):
+                return False
+        except Exception:
+            pass
         s1 = self.cond.shape
         s2 = other.cond.shape
         if s1 != s2:

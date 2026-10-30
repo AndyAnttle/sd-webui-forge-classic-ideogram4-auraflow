@@ -784,6 +784,18 @@ need_global_unload = False
 def manage_model_and_prompt_cache(p: StableDiffusionProcessing):
     global need_global_unload
 
+    if need_global_unload:
+        # A settings change with MiniMax H3 active would move the DiT and the 32B encoder to system RAM only to
+        # free them right after; an emptied hash makes forge_model_reload load it from disk again instead.
+        try:
+            from backend.minimax_h3 import loading as h3_loading
+
+            if h3_loading.reload_instead_of_unload(need_global_unload, sd_models.model_data.sd_model):
+                print("[MiniMax H3] settings changed: reloading H3 from disk instead of moving it to system RAM")
+                sd_models.model_data.forge_hash = ""
+        except Exception:
+            pass
+
     p.sd_model, just_reloaded = forge_model_reload()
 
     if need_global_unload and not just_reloaded:

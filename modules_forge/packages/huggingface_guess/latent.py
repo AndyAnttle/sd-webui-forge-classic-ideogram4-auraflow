@@ -317,3 +317,30 @@ class RGB(LatentFormat):
 
     def process_out(self, latent):
         return latent
+
+
+class MiniMaxH3Latent(LatentFormat):
+    # the video stream; normalization lives inside the VAE, so latents pass through unchanged
+    def __init__(self):
+        self.latent_channels = 24
+        self.scale_factor = 1.0
+        self.latent_rgb_factors = [
+            [-0.018555, 0.024344, -0.017536], [0.150164, 0.137244, 0.129221], [0.027367, -0.050369, -0.208606],
+            [-0.000793, -0.164622, -0.323161], [-0.048556, 0.013970, -0.074286], [0.011740, 0.014172, -0.006906],
+            [0.061517, 0.061212, 0.110025], [0.035321, 0.086879, 0.110059], [-0.017426, 0.002997, 0.035356],
+            [0.531539, 0.548819, 0.624404], [-0.024968, -0.040234, -0.034302], [-0.032549, -0.029096, -0.017221],
+            [0.022609, 0.020286, 0.050661], [-0.084001, -0.038131, -0.020805], [-0.018830, 0.010412, 0.061120],
+            [0.020777, 0.011196, -0.030994], [-0.008390, -0.012201, -0.025687], [-0.013281, -0.002924, 0.006331],
+            [0.000260, 0.001833, -0.011038], [0.105471, 0.100482, 0.132106], [0.016529, 0.015213, 0.009999],
+            [-0.014015, -0.017438, -0.019134], [-0.033787, -0.009984, -0.019725], [0.004224, 0.017284, 0.027196],
+        ]
+        self.latent_rgb_factors_bias = [0.057426, -0.022078, -0.071449]
+
+    def latent_rgb_factors_reshape(self, sample):
+        # Forge's RGB live preview (sd_vae_approx.cheap_approximation) reshapes the latent first: the packed
+        # video+audio latent becomes the middle video frame of the generation being sampled
+        from modules import shared
+
+        from backend.minimax_h3.streams import preview_frame
+        generation = getattr(shared.sd_model, "generation", None)
+        return preview_frame(sample, generation.shapes if generation is not None else None)

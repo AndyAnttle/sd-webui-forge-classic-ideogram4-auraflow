@@ -40,6 +40,13 @@ def calculate_transformer_depth(prefix, state_dict_keys, state_dict):
 def detect_unet_config(state_dict: dict, key_prefix: str) -> dict:
     state_dict_keys = list(state_dict.keys())
 
+    if "{}video_patch_proj.weight".format(key_prefix) in state_dict_keys and "{}audio_patch_proj.weight".format(key_prefix) in state_dict_keys:  # MiniMax H3
+        from backend.minimax_h3 import detect as h3_detect
+
+        h3_config = h3_detect.detect(state_dict, key_prefix)
+        if h3_config is not None:
+            return h3_config
+
     if "{}cap_embedder.1.weight".format(key_prefix) in state_dict_keys and ("{}noise_refiner.0.attention.k_norm.weight".format(key_prefix) in state_dict_keys or "{}layers.0.attention.to_out.0.qweight".format(key_prefix) in state_dict_keys):  # Lumina 2
         dit_config = {}
         dit_config["image_model"] = "lumina2"

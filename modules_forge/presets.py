@@ -18,6 +18,7 @@ class PresetArch(Enum):
     ideogram4 = 14  # Ideogram 4
     auraflow = 15  # AuraFlow
     moss = 16  # MOSS-Image
+    h3 = 17  # MiniMax H3
 
     @staticmethod
     def choices() -> list[str]:
@@ -41,6 +42,7 @@ SAMPLERS = {
     PresetArch.ideogram4: "Euler",
     PresetArch.auraflow: "Euler",
     PresetArch.moss: "Euler",
+    PresetArch.h3: "Res Multistep",
 }
 
 SCHEDULERS = {
@@ -60,6 +62,7 @@ SCHEDULERS = {
     PresetArch.ideogram4: "Simple",
     PresetArch.auraflow: "FlowMatchEulerDiscrete",
     PresetArch.moss: "Simple",
+    PresetArch.h3: "simple",
 }
 
 STEPS = {
@@ -81,6 +84,7 @@ STEPS = {
     # "at least 30 steps". 30 is the safe floor, 40-50 for finer detail.
     PresetArch.auraflow: 30,
     PresetArch.moss: 50,
+    PresetArch.h3: 20,
 }
 
 CFG = {
@@ -105,6 +109,7 @@ CFG = {
     # guidance_scale=3.5; SimpleTuner AuraFlow guide says 3.5-4.0; Pony community runs
     # at 3.5-4.75. CFG 1.0 here would disable guidance entirely (negative prompts ignored).
     PresetArch.auraflow: 3.5,
+    PresetArch.h3: 1.0,
     PresetArch.moss: 3.0,
 }
 
@@ -123,10 +128,12 @@ SHIFT = {
     PresetArch.krea: -1.15,
     PresetArch.auraflow: 3.5,
     PresetArch.moss: 3.0,
+    PresetArch.h3: 12.0,
 }
 
 FRAMES = {
     PresetArch.wan.name: 16,
+    PresetArch.h3.name: 24,
 }
 
 

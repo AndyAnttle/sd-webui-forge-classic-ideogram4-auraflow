@@ -1459,6 +1459,15 @@ def unload_model(model: "ModelPatcher") -> bool:
 
 
 def unload_all_models():
+    try:
+        from modules import sd_models
+        from backend.minimax_h3 import loading as h3_loading
+
+        if h3_loading.release_replaced(current_loaded_models, sd_models.model_data.sd_model):
+            print("[MiniMax H3] released the replaced H3 model without copying it to system RAM")
+    except Exception:
+        pass
+
     devices = {get_torch_device()}
     for loaded in list(current_loaded_models):
         model = loaded.model
