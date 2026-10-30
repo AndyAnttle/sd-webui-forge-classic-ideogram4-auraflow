@@ -46,6 +46,12 @@ def _video_vae_dtype() -> torch.dtype:
     return torch.float32
 
 
+def _vae_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda", torch.cuda.current_device())
+    return torch.device("cpu")
+
+
 class MiniMaxH3Engine(ForgeDiffusionEngine):
     matched_guesses = [MiniMaxH3]
 
@@ -56,9 +62,9 @@ class MiniMaxH3Engine(ForgeDiffusionEngine):
                     tokenizer_dict={"qwen3vl_32b": huggingface_components["tokenizer"]})
 
         pair = huggingface_components["vae"]
-        vae = VAE(model=pair.video, dtype=_video_vae_dtype(), is_wan=True)
+        vae = VAE(model=pair.video, dtype=_video_vae_dtype(), is_wan=True, device=_vae_device())
         vae.latent_channels = 24
-        self.audio_vae = VAE(model=pair.audio, dtype=torch.float32)
+        self.audio_vae = VAE(model=pair.audio, dtype=torch.float32, device=_vae_device())
 
         unet = UnetPatcher.from_model(model=huggingface_components["transformer"], diffusers_scheduler=None,
                                       k_predictor=self._get_predictor(), config=estimated_config)
@@ -330,14 +336,20 @@ class MiniMaxH3Engine(ForgeDiffusionEngine):
 
         video_vae = self.forge_objects.vae
         memory_management.load_model_gpu(video_vae.patcher)
-        pixels = video_vae.first_stage_model.decode(video.to(video_vae.device, video_vae.vae_dtype))  # [1, 3, T, H, W] in [0, 1]
+        # the VAE can sit on a different card than the current CUDA device (memory management moves it),
+        # comfy_kitchen kernels reject DLPack when the current device differs, so decode under the model's own device
+        video_device = next(video_vae.first_stage_model.parameters()).device
+        with torch.cuda.device(video_device):
+            pixels = video_vae.first_stage_model.decode(video.to(video_device, video_vae.vae_dtype))  # [1, 3, T, H, W] in [0, 1]
         if not finite(pixels):
             advice = " Start Forge Neo with --fp32-vae." if video_vae.vae_dtype != torch.float32 else ""
             raise H3Error(f"The H3 video VAE produced NaN or Inf values: the video would come out black.{advice}")
         generation.frames = pixels[0].float().cpu().movedim(1, 0)
 
         memory_management.load_model_gpu(self.audio_vae.patcher)
-        waveform = self.audio_vae.first_stage_model.decode(audio.to(self.audio_vae.device, torch.float32))
+        audio_device = next(self.audio_vae.first_stage_model.parameters()).device
+        with torch.cuda.device(audio_device):
+            waveform = self.audio_vae.first_stage_model.decode(audio.to(audio_device, torch.float32))
         generation.waveform = waveform[0].float().cpu()
 
         return generation.frames[:1].mul(2.0).sub(1.0)

@@ -193,17 +193,30 @@ class VAE:
         n.is_wan = self.is_wan
         return n
 
+    def _model_device(self):
+        try:
+            return next(self.first_stage_model.parameters()).device
+        except StopIteration:
+            return self.device
+
+    def _run_model(self, fn, *args):
+        device = self._model_device()
+        if device.type == "cuda":
+            with torch.cuda.device(device):
+                return fn(*args)
+        return fn(*args)
+
     def decode_tiled_(self, samples, tile_x=64, tile_y=64, overlap=16):
-        decode_fn = lambda a: self.first_stage_model.decode(a.to(self.vae_dtype).to(self.device)).float()
+        decode_fn = lambda a: self._run_model(self.first_stage_model.decode, a.to(self.vae_dtype).to(self._model_device())).float()
         output = self.process_output((tiled_scale(samples, decode_fn, tile_x // 2, tile_y * 2, overlap, upscale_amount=self.upscale_ratio, out_channels=self.output_channels, output_device=self.output_device) + tiled_scale(samples, decode_fn, tile_x * 2, tile_y // 2, overlap, upscale_amount=self.upscale_ratio, out_channels=self.output_channels, output_device=self.output_device) + tiled_scale(samples, decode_fn, tile_x, tile_y, overlap, upscale_amount=self.upscale_ratio, out_channels=self.output_channels, output_device=self.output_device)) / 3.0)
         return output
 
     def decode_tiled_3d(self, samples, tile_t=999, tile_x=32, tile_y=32, overlap=(1, 8, 8)):
-        decode_fn = lambda a: self.first_stage_model.decode(a.to(self.vae_dtype).to(self.device)).float()
+        decode_fn = lambda a: self._run_model(self.first_stage_model.decode, a.to(self.vae_dtype).to(self._model_device())).float()
         return self.process_output(tiled_scale_multidim(samples, decode_fn, tile=(tile_t, tile_x, tile_y), overlap=overlap, upscale_amount=self.upscale_ratio, out_channels=self.output_channels, index_formulas=self.upscale_index_formula, output_device=self.output_device))
 
     def encode_tiled_(self, pixel_samples, tile_x=512, tile_y=512, overlap=64):
-        encode_fn = lambda a: self.first_stage_model.encode((self.process_input(a)).to(self.vae_dtype).to(self.device)).float()
+        encode_fn = lambda a: self._run_model(self.first_stage_model.encode, (self.process_input(a)).to(self.vae_dtype).to(self._model_device())).float()
         samples = tiled_scale(pixel_samples, encode_fn, tile_x, tile_y, overlap, upscale_amount=(1 / self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device)
         samples += tiled_scale(pixel_samples, encode_fn, tile_x * 2, tile_y // 2, overlap, upscale_amount=(1 / self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device)
         samples += tiled_scale(pixel_samples, encode_fn, tile_x // 2, tile_y * 2, overlap, upscale_amount=(1 / self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device)
@@ -211,7 +224,7 @@ class VAE:
         return samples
 
     def encode_tiled_3d(self, samples, tile_t=9999, tile_x=512, tile_y=512, overlap=(1, 64, 64)):
-        encode_fn = lambda a: self.first_stage_model.encode((self.process_input(a)).to(self.vae_dtype).to(self.device)).float()
+        encode_fn = lambda a: self._run_model(self.first_stage_model.encode, (self.process_input(a)).to(self.vae_dtype).to(self._model_device())).float()
         return tiled_scale_multidim(samples, encode_fn, tile=(tile_t, tile_x, tile_y), overlap=overlap, upscale_amount=self.downscale_ratio, out_channels=self.latent_channels, downscale=True, index_formulas=self.downscale_index_formula, output_device=self.output_device)
 
     def decode(self, samples_in: torch.Tensor):
@@ -224,13 +237,13 @@ class VAE:
         try:
             memory_used = self.memory_used_decode(samples_in.shape, self.vae_dtype)
             memory_management.load_models_gpu([self.patcher], memory_required=memory_used)
-            free_memory = memory_management.get_free_memory(self.device)
+            free_memory = memory_management.get_free_memory(self._model_device())
             batch_number = int(free_memory / memory_used)
             batch_number = max(1, batch_number)
 
             for x in range(0, samples_in.shape[0], batch_number):
-                samples = samples_in[x : x + batch_number].to(device=self.device, dtype=self.vae_dtype)
-                out = self.process_output(self.first_stage_model.decode(samples).to(device=self.output_device, dtype=torch.float32, copy=True))
+                samples = samples_in[x : x + batch_number].to(device=self._model_device(), dtype=self.vae_dtype)
+                out = self.process_output(self._run_model(self.first_stage_model.decode, samples).to(device=self.output_device, dtype=torch.float32, copy=True))
                 if pixel_samples is None:
                     pixel_samples = torch.empty((samples_in.shape[0],) + tuple(out.shape[1:]), device=self.output_device)
                 pixel_samples[x : x + batch_number] = out
@@ -276,13 +289,13 @@ class VAE:
         try:
             memory_used = self.memory_used_encode(_samples.shape, self.vae_dtype)
             memory_management.load_models_gpu([self.patcher], memory_required=memory_used)
-            free_memory = memory_management.get_free_memory(self.device)
+            free_memory = memory_management.get_free_memory(self._model_device())
             batch_number = int(free_memory / max(1, memory_used))
             batch_number = max(1, batch_number)
             samples = None
             for x in range(0, _samples.shape[0], batch_number):
                 pixels_in = self.process_input(_samples[x : x + batch_number]).to(self.vae_dtype).to(self.device)
-                out = self.first_stage_model.encode(pixels_in).to(self.output_device).float()
+                out = self._run_model(self.first_stage_model.encode, pixels_in).to(self.output_device).float()
                 if samples is None:
                     samples = torch.empty((_samples.shape[0],) + tuple(out.shape[1:]), device=self.output_device)
                 samples[x : x + batch_number] = out

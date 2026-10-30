@@ -58,7 +58,17 @@ All files live in `V:\VidModels\MiniMAX-H3` and are linked into these folders.
 - Prompt: `A red paper boat drifting on a calm lake at sunset, gentle ripples, soft ambient music`.
 - Expected: an MP4 in `output/videos`, about 45-50 s on a 3090 after the model is loaded (the first run is longer while the 12.5 GB checkpoint loads).
 
-## 7. Memory and launch
+## 7. LoRA and speedups
+
+- The **LoRA** row lists every file in `models/Lora` whose name contains `minimax` or `h3` (h3 as a separate word, so `epoch35` is not picked up). The refresh button rescans the folder after new files are added.
+- On selection the header is checked: `base_model` metadata with MiniMax-H3, or the `diffusion_model.blocks.N.attn.qkv_proj` keys with no more than 64 blocks. If the file is not an H3 LoRA, the status says why and the LoRA is not applied.
+- **LoRA weight** 0.5-1.5, 1.0 by default.
+- **8-step turbo preset** is enabled once a valid LoRA is selected: Steps 8, Shift 6, CFG 1.0.
+- The `<lora:name:weight>` tag is added to the prompt automatically and kept in the infotext, so the result can be reproduced by hand.
+- Example: `h3_turbo_8step` at 768x768, 124 frames, 8 steps takes about 4-5 minutes instead of 10:45 at 20 steps.
+- **Important:** for NVFP4 checkpoints set **Diffusion in Low Bits** to `Automatic (fp16 LoRA)`. With plain `Automatic` Forge merges the LoRA into the NVFP4 weights: a reload of about 2.5 minutes and a step about 6 times slower (12 s/step against 2.1 s/step with on-the-fly).
+
+## 8. Memory and launch
 
 - Keep the 32B text encoder on the second card: `CUDA_VISIBLE_DEVICES` with two 3090s and `--text-enc-device cuda:1`.
 - DiT NVFP4 about 12.5 GB, video VAE 5.2 GB, audio VAE 0.6 GB: fits a 24 GB card with room to spare.
