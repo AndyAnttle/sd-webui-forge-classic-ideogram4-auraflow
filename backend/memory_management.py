@@ -1116,7 +1116,11 @@ def pytorch_attention_enabled() -> bool:
 
 
 def pytorch_attention_enabled_vae() -> bool:
-    return ENABLE_PYTORCH_ATTENTION and not is_amd()
+    if is_amd():
+        arch = torch.cuda.get_device_properties(get_torch_device()).gcnArchName
+        if arch.startswith("gfx11"):
+            return False
+    return ENABLE_PYTORCH_ATTENTION
 
 
 def pytorch_attention_flash_attention() -> bool:
