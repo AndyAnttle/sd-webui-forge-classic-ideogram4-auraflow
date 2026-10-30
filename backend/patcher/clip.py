@@ -19,6 +19,18 @@ class CLIP:
         self.tokenizer = ObjectDict(tokenizer_dict)
         self.patcher = ModelPatcher(self.cond_stage_model, load_device=load_device, offload_device=offload_device)
 
+        # A text encoder explicitly placed on its own GPU stays resident there (see
+        # memory_management.text_encoder_offload_device), but only while it leaves room to work:
+        # a 32B encoder that fills the card cannot allocate the transient buffers of the next
+        # prompt encode (MiniMax H3: 19.5 of 24 GB, OOM on the third prompt). Anything that takes
+        # more than ~60% of the device goes back to CPU offloading instead.
+        if offload_device == load_device and load_device.type == "cuda":
+            try:
+                if self.patcher.model_size() > memory_management.get_total_memory(load_device) * 0.6:
+                    self.patcher.offload_device = memory_management.cpu
+            except Exception:
+                pass
+
     def clone(self):
         n = CLIP(no_init=True)
         n.patcher = self.patcher.clone()
