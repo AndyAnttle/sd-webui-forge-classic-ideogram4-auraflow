@@ -83,10 +83,14 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 >   resolutions (1024+), which the Pony author also recommends.
 
 - [X] Support [Moss-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT)
+    - **Moss-Image Edit**: switch **Settings/Stable Diffusion → [Moss-Image] Reference Method** to `ai-toolkit` or `Moss-Image-Edit` and load the matching Edit LoRA; while a reference image is attached, `img2img` is replaced by the reference path (same convention as the other Edit models)
 - [X] Support [Qwen-Image-2.1](https://huggingface.co/Qwen/Qwen-Image-2.1)
 - [X] Support [Krea 2](https://huggingface.co/krea/Krea-2-Turbo)
 - [X] Support **Krea 2 Identity Edit**
     - require specific [LoRA](https://civitai.com/models/2761113/krea-2-identity-edit)
+- [X] Support **Krea 2 Control** (Control-LoRA)
+    - accepts the `Krea-2-depth-controlnet` layout (rank-64 block LoRA pairs plus an expanded input projection); pick the file as the control model and supply a control image as usual
+    - v1 notes: the control applies across the full guidance range, the control image is normalized per-image (min/max), `invert` is not exposed
 - [X] Support [Anima 2B](https://huggingface.co/circlestone-labs/Anima) / [Anima 2.9B](https://huggingface.co/Gazingstars123/Anima-2.9B) / [Anima 3.8B](https://huggingface.co/lylogummy/Anima-3.8B)
     - automatically map LoRA / Controllllite for 2.9B & 3.8B
     - `qwen35_4b` adapter requires [Extension](https://github.com/GumGum10/forge-anima-3.8B)
@@ -97,6 +101,14 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 
 > [!Note]
 > To toggle between `img2img` and `reference` (`edit`) for `Qwen-Image-2.1` / `Krea 2` / `Anima` / `Flux.2-Klein`, refer to **Settings/Stable Diffusion**
+
+> [!Tip]
+> **Placing the text encoder on a second GPU**
+> Large checkpoints swap the text encoder in and out of VRAM on a single card. To keep it on its own GPU instead:
+> - expose both cards with the model card first: `set CUDA_VISIBLE_DEVICES=2,1` (the first entry becomes `cuda:0`)
+> - point the text encoder, and optionally the VAE, at the second one: `--text-enc-device cuda:1 --vae-device cuda:1`
+>
+> Both stay resident on that card afterwards, so prompts no longer pay a full encoder upload. `--gpu-device-id` is the opposite tool (it hides every other device), so do not combine it with these flags.
 
 - [X] Support [Ernie-Image](https://huggingface.co/baidu/ERNIE-Image)
 - [X] Support [PiD 1.5](https://huggingface.co/nvidia/PiD)
