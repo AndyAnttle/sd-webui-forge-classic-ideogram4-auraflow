@@ -892,6 +892,10 @@ def inference_cast(weight_dtype: torch.dtype, inference_device: torch.device, su
 
 
 def text_encoder_offload_device() -> torch.device:
+    if args.text_enc_device is not None:
+        # an explicitly placed text encoder stays on its own device: moving it back to
+        # CPU after every prompt makes each generation pay the full upload again
+        return torch.device(args.text_enc_device)
     return get_torch_device() if args.gpu_only else cpu
 
 
@@ -952,6 +956,8 @@ def vae_device() -> torch.device:
 
 
 def vae_offload_device() -> torch.device:
+    if args.vae_device is not None:
+        return torch.device(args.vae_device)
     return get_torch_device() if args.gpu_only else cpu
 
 

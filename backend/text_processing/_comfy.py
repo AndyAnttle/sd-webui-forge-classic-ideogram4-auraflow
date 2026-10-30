@@ -1,6 +1,7 @@
 # https://github.com/Comfy-Org/ComfyUI/blob/v0.36.0/comfy/sd1_clip.py
 
 import numbers
+from contextlib import nullcontext
 from typing import Final, TypeAlias
 
 import torch
@@ -213,6 +214,15 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
     def forward(self, tokens):
         device = self.transformer.get_input_embeddings().weight.device
 
+        # Quantized weights (comfy_kitchen fp8/int8) reach DLPack exports that require
+        # the tensor's CUDA device to be the process' current device. When the text
+        # encoder is placed on a second GPU (--text-enc-device) that does not hold, and
+        # the export raises "Can't export tensors on a different CUDA device index".
+        ctx = torch.cuda.device(device) if device.type == "cuda" else nullcontext()
+        with ctx:
+            return self._forward_on_device(tokens, device)
+
+    def _forward_on_device(self, tokens, device):
         embeds, attention_mask, num_tokens, embeds_info = self.process_tokens(tokens, device)
 
         attention_mask_model = None
