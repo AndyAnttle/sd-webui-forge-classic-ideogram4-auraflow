@@ -47,6 +47,8 @@ The name "Forge" is inspired by "Minecraft Forge". This project aims to become t
 > - 768x768, 124 frames, 20 steps: about 11 minutes on a 3090; 1024x1024 is outside the model's 768p spec and costs about 81 s/step
 > - turbo: select `h3_turbo_8step` in the panel and press **8-step turbo preset**, or put `<lora:h3_turbo_8step:1>` into the prompt
 
+<p align="center"><img src="html\minimax-h3.webp" width=768 alt="MiniMax-H3 in Forge: the H3 accordion and a generated clip with audio"></p>
+
 - [X] Support [Ideogram 4.0](https://huggingface.co/ideogram-research/Ideogram-4.0)
     - use **Ideogram 4 Studio** (see below) instead of the plain prompt box
     - requires two accompanying modules (selected in the VAE / Text Encoder dropdowns):
